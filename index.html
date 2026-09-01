@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rides Pipeline - Dataset Download</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f6f9;
+    color: #1a1a1a;
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    padding: 32px;
+    max-width: 460px;
+    width: 100%;
+  }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p.sub { color: #666; font-size: 14px; margin: 0 0 24px; }
+  label { font-size: 13px; font-weight: 600; color: #333; display: block; margin-bottom: 6px; }
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    text-transform: uppercase;
+  }
+  input:focus { outline: none; border-color: #2f6fed; box-shadow: 0 0 0 3px rgba(47,111,237,0.15); }
+  button {
+    margin-top: 16px;
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    background: #2f6fed;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: #2559c4; }
+  button:disabled { background: #a9b8d6; cursor: not-allowed; }
+  #status {
+    margin-top: 16px;
+    font-size: 13.5px;
+    min-height: 18px;
+  }
+  #status.error { color: #c0392b; }
+  #status.ok { color: #1f7a3d; }
+  footer { margin-top: 20px; font-size: 11.5px; color: #999; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Rides Pipeline Dataset</h1>
+    <p class="sub">Enter your SRN to download your assigned trips.csv for the Big Data assignment.</p>
+    <label for="srn">SRN</label>
+    <input id="srn" type="text" placeholder="PES1UG24CS002" autocomplete="off" spellcheck="false">
+    <button id="downloadBtn">Download trips.csv</button>
+    <div id="status"></div>
+    <footer>Each SRN is assigned one of 10 fixed datasets. Your download is always named trips.csv.</footer>
+  </div>
+
+<script>
+let mapping = null;
+
+async function loadMapping() {
+  const res = await fetch("mapping.json", { cache: "no-store" });
+  if (!res.ok) throw new Error("mapping fetch failed: " + res.status);
+  mapping = await res.json();
+}
+
+function setStatus(msg, kind) {
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = kind || "";
+}
+
+async function handleDownload() {
+  const input = document.getElementById("srn");
+  const srn = input.value.trim().toUpperCase();
+  const btn = document.getElementById("downloadBtn");
+
+  if (!srn) {
+    setStatus("Enter your SRN first.", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus("Looking up your dataset...", "");
+
+  try {
+    if (!mapping) await loadMapping();
+
+    const datasetNum = mapping[srn];
+    if (!datasetNum) {
+      setStatus("SRN not found. Check for typos, or contact the instructor if you're enrolled.", "error");
+      return;
+    }
+
+    const fileRes = await fetch(`datasets/trips_${datasetNum}.csv`);
+    if (!fileRes.ok) throw new Error("dataset fetch failed: " + fileRes.status);
+    const blob = await fileRes.blob();
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "trips.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    setStatus("Downloaded trips.csv. Use this as your pipeline input.", "ok");
+  } catch (err) {
+    setStatus("Something went wrong. Please try again or contact the instructor.", "error");
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("downloadBtn").addEventListener("click", handleDownload);
+document.getElementById("srn").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") handleDownload();
+});
+</script>
+</body>
+</html>
