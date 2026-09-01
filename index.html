@@ -72,12 +72,14 @@
   </div>
 
 <script>
-let mapping = null;
+// SRN -> dataset is resolved by hashing the SRN and fetching d/<hash>.csv.
+// No roster file is shipped to the browser. SALT is visible here on purpose;
+// it is friction against a plain SRN-list hash sweep, not a real secret.
+const SALT = "bdta-a1-2026-";
 
-async function loadMapping() {
-  const res = await fetch("mapping.json", { cache: "no-store" });
-  if (!res.ok) throw new Error("mapping fetch failed: " + res.status);
-  mapping = await res.json();
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function setStatus(msg, kind) {
@@ -100,15 +102,12 @@ async function handleDownload() {
   setStatus("Looking up your dataset...", "");
 
   try {
-    if (!mapping) await loadMapping();
-
-    const datasetNum = mapping[srn];
-    if (!datasetNum) {
+    const hash = await sha256hex(SALT + srn);
+    const fileRes = await fetch(`d/${hash}.csv`);
+    if (fileRes.status === 404) {
       setStatus("SRN not found. Check for typos, or contact the instructor if you're enrolled.", "error");
       return;
     }
-
-    const fileRes = await fetch(`datasets/trips_${datasetNum}.csv`);
     if (!fileRes.ok) throw new Error("dataset fetch failed: " + fileRes.status);
     const blob = await fileRes.blob();
 
